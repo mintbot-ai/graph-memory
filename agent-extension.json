@@ -1,0 +1,111 @@
+{
+  "spec_version": "0.2",
+  "kind": "agent-extension",
+  "identity": {
+    "name": "graph-memory",
+    "version": "0.1.0",
+    "display_name": "Graph Memory",
+    "description": "Temporal knowledge-graph long-term memory using the agent's selected Hermes model for extraction, local FastEmbed vectors for semantic recall, and an embedded Kuzu database.",
+    "author": "mintbot.ai",
+    "license": "MIT",
+    "homepage": "https://github.com/mintbot-ai/graph-memory"
+  },
+  "provides": {
+    "tools": [
+      {
+        "name": "memory_query",
+        "summary": "Search temporal graph memory for facts, entities, relationships, and history.",
+        "input_schema_ref": "schemas/memory_query.json"
+      },
+      {
+        "name": "memory_write",
+        "summary": "Store a durable fact, decision, event, or relationship in temporal graph memory.",
+        "input_schema_ref": "schemas/memory_write.json"
+      }
+    ],
+    "memory": [
+      {
+        "name": "graph",
+        "kind": "graph",
+        "summary": "Profile-scoped temporal knowledge graph backed by embedded Kuzu.",
+        "schema_ref": "schemas/graph.md"
+      }
+    ],
+    "config": {
+      "schema_ref": "schemas/config.schema.json",
+      "secrets": []
+    }
+  },
+  "requires": {
+    "resources": {
+      "disk_mb": 600,
+      "ram_mb": 512
+    }
+  },
+  "permissions": {
+    "network_egress": [
+      "hermes:active-llm",
+      "huggingface.co:443",
+      "cdn-lfs.huggingface.co:443",
+      "cas-bridge.xethub.hf.co:443"
+    ],
+    "filesystem": [
+      "state:rw",
+      "config:rw",
+      "plugins:rw"
+    ],
+    "root": true,
+    "reason": "Installs a Hermes MemoryProvider and its Python dependencies, activates it in config.yaml, stores a profile-scoped Kuzu database under HERMES_HOME, downloads the selected FastEmbed model once, and calls the provider already selected by Hermes for entity and relationship extraction. Root is only needed for the default /opt lifecycle-script location; standalone non-root installs fall back under HERMES_HOME."
+  },
+  "release": {
+    "channel": "beta",
+    "published_at": "2026-07-28T15:04:41Z",
+    "valid_until": "2026-08-27T15:04:41Z",
+    "changelog": "https://github.com/mintbot-ai/graph-memory/releases/tag/v0.1.0",
+    "artifact": {
+      "url": "https://github.com/mintbot-ai/graph-memory/releases/download/v0.1.0/graph-memory-0.1.0.tar.gz",
+      "sha256": "TBD-fill-at-publish-time"
+    }
+  },
+  "updates": {
+    "source": {
+      "kind": "github",
+      "repo": "mintbot-ai/graph-memory"
+    },
+    "check": "daily",
+    "policy": "notify"
+  },
+  "targets": [
+    {
+      "runtime": "hermes",
+      "runtime_version": ">= 0.18.2",
+      "enforcement": "declared",
+      "delivery": {
+        "method": "hermes-integration",
+        "install_url": "https://github.com/mintbot-ai/graph-memory/releases/download/v0.1.0/graph-memory-0.1.0.tar.gz",
+        "install_sha256": "TBD-fill-at-publish-time",
+        "uninstall_command": "/opt/graph-memory/uninstall.sh",
+        "requires_oauth": null
+      },
+      "lifecycle": {
+        "install": "install.sh",
+        "upgrade": "upgrade.sh",
+        "uninstall": "uninstall.sh",
+        "health": "healthcheck.sh"
+      },
+      "component_map": {
+        "tools": {
+          "module": "./",
+          "register": "__init__.py:register",
+          "names": ["memory_query", "memory_write"]
+        },
+        "memory": {
+          "provider": "graph-memory",
+          "driver": "kuzu",
+          "database": "$HERMES_HOME/graph-memory/graph.kuzu",
+          "activation": "memory.provider=graph-memory"
+        }
+      }
+    }
+  ]
+}

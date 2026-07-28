@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "memory_write input",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "content": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Durable fact, decision, event, or relationship to add to graph memory."
+    }
+  },
+  "required": ["content"]
+}
