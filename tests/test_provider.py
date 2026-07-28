@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import concurrent.futures
 import json
 from types import SimpleNamespace
@@ -123,3 +124,16 @@ def test_graphiti_calls_never_use_custom_group_ids(plugin_module):
         provider._async.close()
 
     assert captured["group_id"] is None
+
+
+def test_required_kuzu_fts_indexes_are_created_idempotently(plugin_module, tmp_path):
+    from graphiti_core.driver.kuzu_driver import KuzuDriver
+
+    driver = KuzuDriver(db=str(tmp_path / "graph.kuzu"))
+
+    async def verify():
+        await plugin_module.GraphMemoryProvider._ensure_kuzu_indexes(driver)
+        await plugin_module.GraphMemoryProvider._ensure_kuzu_indexes(driver)
+        return True
+
+    assert asyncio.run(verify()) is True

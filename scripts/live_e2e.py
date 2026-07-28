@@ -29,17 +29,32 @@ from hermes_llm import HermesAgentLLMClient
 from local_embeddings import LocalCosineReranker, LocalFastEmbedder
 
 
+async def ensure_kuzu_indexes(driver: KuzuDriver) -> None:
+    """Create the FTS indexes Graphiti's Kuzu search path requires.
+
+    Graphiti 0.29.3 leaves ``KuzuDriver.build_indices_and_constraints`` as a
+    no-op, although its search queries assume these indexes already exist.
+    """
+    for query in get_fulltext_indices(GraphProvider.KUZU):
+        try:
+            await driver.execute_query(query)
+        except RuntimeError as exc:
+            if "already exists" not in str(exc).lower():
+                raise
+
+
 async def main() -> None:
     temp_dir = Path(tempfile.mkdtemp(prefix="graph-memory-live-e2e-"))
+    driver = KuzuDriver(db=str(temp_dir / "graph.kuzu"))
     graph = Graphiti(
-        graph_driver=KuzuDriver(db=str(temp_dir / "graph.kuzu")),
+        graph_driver=driver,
         llm_client=HermesAgentLLMClient(),
         embedder=LocalFastEmbedder(),
         cross_encoder=LocalCosineReranker(),
         max_coroutines=1,
     )
     try:
-        await graph.build_indices_and_constraints()
+        await ensure_kuzu_indexes(driver)
         await graph.add_episode(
             name="database-decision",
             episode_body=(
