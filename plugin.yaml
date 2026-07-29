@@ -4,8 +4,8 @@ version: 0.1.0
 description: >-
   Temporal knowledge-graph long-term memory. Graphiti extracts entities,
   relationships and validity windows with the agent's selected Hermes model;
-  FastEmbed and embedded Kuzu keep recall and storage local.
+  FastEmbed and embedded LadybugDB keep recall and storage local.
 pip_dependencies:
   - graphiti-core==0.29.3
-  - kuzu==0.11.3
+  - ladybug==0.18.3
   - fastembed>=0.7.3,<0.8

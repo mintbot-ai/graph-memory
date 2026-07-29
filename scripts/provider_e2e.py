@@ -2,7 +2,7 @@
 """Live E2E through the actual Hermes MemoryProvider contract.
 
 Consumes the active provider's quota/credit. Uses a temporary HERMES_HOME for
-the Kuzu database while resolving LLM credentials/model from the caller's real
+the Ladybug database while resolving LLM credentials/model from the caller's real
 active Hermes configuration.
 """
 
@@ -52,7 +52,8 @@ def main() -> None:
                 "memory_write",
                 {
                     "content": (
-                        "Mart selected embedded Kuzu for the Graph Memory project. "
+                        "Mart selected embedded LadybugDB, the maintained Kuzu "
+                        "continuation, for the Graph Memory project. "
                         "Graph Memory is the first AXP reference implementation."
                     )
                 },
@@ -65,13 +66,13 @@ def main() -> None:
         query_result = json.loads(
             provider.handle_tool_call(
                 "memory_query",
-                {"query": "Which database does the AXP graph-memory implementation use?"},
+                {"query": "Which maintained database does the AXP graph-memory implementation use?"},
             )
         )
         print("query_result=" + json.dumps(query_result, sort_keys=True))
         facts = query_result.get("facts") or []
-        if not any("kuzu" in str(fact).lower() for fact in facts):
-            raise AssertionError("provider recall did not return the Kuzu fact")
+        if not any("ladybug" in str(fact).lower() for fact in facts):
+            raise AssertionError("provider recall did not return the LadybugDB fact")
         print("PROVIDER_E2E_OK")
     finally:
         provider.shutdown()

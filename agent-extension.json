@@ -5,7 +5,7 @@
     "name": "graph-memory",
     "version": "0.1.0",
     "display_name": "Graph Memory",
-    "description": "Temporal knowledge-graph long-term memory using the agent's selected Hermes model for extraction, local FastEmbed vectors for semantic recall, and an embedded Kuzu database.",
+    "description": "Temporal knowledge-graph long-term memory using the agent's selected Hermes model for extraction, local FastEmbed vectors for semantic recall, and embedded LadybugDB, the maintained continuation of Kuzu.",
     "author": "mintbot.ai",
     "license": "MIT",
     "homepage": "https://github.com/mintbot-ai/graph-memory"
@@ -27,7 +27,7 @@
       {
         "name": "graph",
         "kind": "graph",
-        "summary": "Profile-scoped temporal knowledge graph backed by embedded Kuzu.",
+        "summary": "Profile-scoped temporal knowledge graph backed by embedded LadybugDB.",
         "schema_ref": "schemas/graph.md"
       }
     ],
@@ -47,7 +47,10 @@
       "hermes:active-llm",
       "huggingface.co:443",
       "cdn-lfs.huggingface.co:443",
-      "cas-bridge.xethub.hf.co:443"
+      "cas-bridge.xethub.hf.co:443",
+      "extension.ladybugdb.com:443",
+      "pypi.org:443",
+      "files.pythonhosted.org:443"
     ],
     "filesystem": [
       "state:rw",
@@ -55,7 +58,7 @@
       "plugins:rw"
     ],
     "root": true,
-    "reason": "Installs a Hermes MemoryProvider and its Python dependencies, activates it in config.yaml, stores a profile-scoped Kuzu database under HERMES_HOME, downloads the selected FastEmbed model once, and calls the provider already selected by Hermes for entity and relationship extraction. Root is only needed for the default /opt lifecycle-script location; standalone non-root installs fall back under HERMES_HOME."
+    "reason": "Installs a Hermes MemoryProvider and its Python dependencies, activates it in config.yaml, stores a profile-scoped Ladybug database under HERMES_HOME, downloads the selected FastEmbed model once, and calls the provider already selected by Hermes for entity and relationship extraction. Root is only needed for the default /opt lifecycle-script location; standalone non-root installs fall back under HERMES_HOME."
   },
   "release": {
     "channel": "beta",
@@ -101,8 +104,9 @@
         },
         "memory": {
           "provider": "graph-memory",
-          "driver": "kuzu",
-          "database": "$HERMES_HOME/graph-memory/graph.kuzu",
+          "driver": "ladybug",
+          "compatibility_family": "kuzu",
+          "database": "$HERMES_HOME/graph-memory/graph.lbug",
           "activation": "memory.provider=graph-memory"
         }
       }

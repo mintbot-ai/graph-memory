@@ -89,7 +89,7 @@ def test_replace_and_remove_become_temporal_events(plugin_module):
     provider.on_memory_write(
         "replace",
         "memory",
-        "Kuzu is selected.",
+        "LadybugDB is selected.",
         {"old_text": "FalkorDB is selected."},
     )
     provider.on_memory_write(
@@ -102,7 +102,7 @@ def test_replace_and_remove_become_temporal_events(plugin_module):
 
     assert "superseded" in seen[0][0]
     assert "FalkorDB" in seen[0][0]
-    assert "Kuzu" in seen[0][0]
+    assert "LadybugDB" in seen[0][0]
     assert "no longer valid" in seen[1][0]
     assert "old deployment rule" in seen[1][0]
 
@@ -126,14 +126,15 @@ def test_graphiti_calls_never_use_custom_group_ids(plugin_module):
     assert captured["group_id"] is None
 
 
-def test_required_kuzu_fts_indexes_are_created_idempotently(plugin_module, tmp_path):
-    from graphiti_core.driver.kuzu_driver import KuzuDriver
+def test_required_ladybug_fts_indexes_are_created_idempotently(plugin_module, tmp_path):
+    from ladybug_driver import LadybugDriver
 
-    driver = KuzuDriver(db=str(tmp_path / "graph.kuzu"))
+    driver = LadybugDriver(db=str(tmp_path / "graph.lbug"))
 
     async def verify():
-        await plugin_module.GraphMemoryProvider._ensure_kuzu_indexes(driver)
-        await plugin_module.GraphMemoryProvider._ensure_kuzu_indexes(driver)
-        return True
+        await plugin_module.GraphMemoryProvider._ensure_ladybug_indexes(driver)
+        await plugin_module.GraphMemoryProvider._ensure_ladybug_indexes(driver)
+        rows, _, _ = await driver.execute_query("RETURN $x AS value")
+        return rows
 
-    assert asyncio.run(verify()) is True
+    assert asyncio.run(verify()) == [{"value": None}]

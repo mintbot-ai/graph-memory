@@ -22,7 +22,7 @@ Hermes turn / explicit memory write
        Graphiti temporal graph
           ┌──────┴──────┐
           ▼             ▼
-  embedded Kuzu    local FastEmbed
+ embedded Ladybug  local FastEmbed
    graph store      semantic vectors
 ```
 
@@ -31,9 +31,16 @@ Hermes turn / explicit memory write
   recursion and avoiding a second credential configuration.
 - Embeddings and reranking run locally with `BAAI/bge-small-en-v1.5` through
   FastEmbed/ONNX. There is no embeddings API cost or data egress.
-- Kuzu runs in-process and stores one profile-scoped database at
-  `$HERMES_HOME/graph-memory/graph.kuzu`. There is no Docker container, port,
-  database daemon, or password to operate.
+- LadybugDB, the actively maintained continuation of Kuzu, runs in-process and
+  stores one profile-scoped database at `$HERMES_HOME/graph-memory/graph.lbug`.
+  An existing `graph.kuzu` store is migrated automatically through Kuzu
+  `EXPORT DATABASE` → Ladybug `IMPORT DATABASE`; the legacy store is retained
+  as a backup. The archived Kuzu wheel is not a runtime dependency; if it is
+  unavailable during migration, the helper fetches `kuzu==0.11.3` into an
+  ephemeral `uv` environment used only for the export process.
+  There is no Docker container, port,
+  database daemon, or password to operate. Ladybug's FTS extension is downloaded
+  once from `extension.ladybugdb.com` and loaded locally on each startup.
 
 ## What it provides
 
@@ -107,16 +114,16 @@ AXP_PURGE=1 ./uninstall.sh               # also deletes long-term memory
 
 `hermes backup` already includes the graph because it lives under HERMES_HOME.
 
-## Important Kuzu constraints
+## LadybugDB storage
 
-Kuzu was selected for its excellent embedded, zero-service shape. Graphiti
-0.29.3 marks its Kuzu driver deprecated because the upstream Kuzu project is no
-longer maintained. This extension therefore pins the exact tested pair
-`graphiti-core==0.29.3` and `kuzu==0.11.3`, labels the initial AXP release
-`beta`, and keeps the storage boundary isolated so a future FalkorDB/Neo4j
-migration can replace the driver without changing the Hermes provider contract.
+LadybugDB is the active continuation of the archived Kuzu project. The
+extension pins the tested pair `graphiti-core==0.29.3` and `ladybug==0.18.3`.
+An isolated compatibility adapter binds Graphiti's Kuzu-named operation layer
+to Ladybug's maintained Python API; the archived `kuzu` wheel is not installed.
+The adapter boundary can be replaced by a future native Graphiti Ladybug driver
+without changing the Hermes provider contract or on-disk graph.
 
-Kuzu also allows one process to own a database at a time. Do not run a CLI and
+Ladybug also allows one process to own a database at a time. Do not run a CLI and
 gateway concurrently against the same Hermes profile while this provider is
 active. Different Hermes profiles have separate databases and are isolated.
 
@@ -129,7 +136,7 @@ pip install -r requirements-dev.txt
 pytest -q
 ```
 
-The integration test exercises the real Kuzu/FastEmbed stack. A live extraction
+The integration test exercises the real Ladybug/FastEmbed stack. A live extraction
 test additionally uses whichever Hermes model/provider is currently selected.
 
 ## License

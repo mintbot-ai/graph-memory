@@ -9,7 +9,7 @@ The agent's own model (an Anthropic-shaped chat endpoint) does the reasoning
 (entity/edge extraction), but Anthropic exposes no embeddings endpoint, so
 both of the pieces here run **locally** via fastembed (ONNX on CPU). This keeps
 the whole memory backend self-contained: zero per-recall API cost, zero
-external egress, matching the embedded-Kuzu philosophy.
+external egress, matching the embedded-Ladybug philosophy.
 
 The reranker deliberately reuses the same embedding model (cosine similarity
 between query and passage vectors) instead of pulling in a heavyweight

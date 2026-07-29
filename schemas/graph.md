@@ -1,6 +1,7 @@
 # Graph model
 
-Graphiti owns the physical Kuzu schema. The stable logical model exposed by
+Graphiti owns the physical embedded graph schema. LadybugDB, the maintained
+continuation of Kuzu, provides the storage engine. The stable logical model exposed by
 this extension is:
 
 - Entity nodes: people, projects, topics, decisions, organizations, artifacts,
@@ -13,7 +14,9 @@ this extension is:
 - Semantic vectors: 384-dimensional local FastEmbed vectors support recall by
   meaning even when query wording differs from the stored fact.
 
-The Kuzu database is profile-scoped at `$HERMES_HOME/graph-memory/graph.kuzu`.
+The Ladybug database is profile-scoped at `$HERMES_HOME/graph-memory/graph.lbug`.
+An existing `graph.kuzu` database is migrated by export/import and retained as
+a backup.
 No custom Graphiti `group_id` is used because each Hermes profile already has a
-separate database and Graphiti 0.29.3's Kuzu driver does not support named
+separate database and Graphiti 0.29.3's embedded operation layer does not support named
 database groups.

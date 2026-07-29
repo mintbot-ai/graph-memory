@@ -17,14 +17,22 @@ if [ "$(id -u)" -ne 0 ] && [[ "${LIFECYCLE_DIR}" == /opt/* ]]; then
 fi
 
 log "installing Hermes provider at ${PLUGIN_DIR}"
-install -d -m 0755 "${PLUGIN_DIR}" "${PLUGIN_DIR}/schemas" "${LIFECYCLE_DIR}"
+install -d -m 0755 \
+  "${PLUGIN_DIR}" \
+  "${PLUGIN_DIR}/schemas" \
+  "${PLUGIN_DIR}/scripts" \
+  "${LIFECYCLE_DIR}"
 install -m 0644 \
   "${SOURCE_DIR}/__init__.py" \
   "${SOURCE_DIR}/hermes_llm.py" \
+  "${SOURCE_DIR}/ladybug_driver.py" \
   "${SOURCE_DIR}/local_embeddings.py" \
   "${SOURCE_DIR}/plugin.yaml" \
   "${PLUGIN_DIR}/"
 install -m 0644 "${SOURCE_DIR}"/schemas/* "${PLUGIN_DIR}/schemas/"
+install -m 0755 \
+  "${SOURCE_DIR}/scripts/migrate_kuzu_to_ladybug.py" \
+  "${PLUGIN_DIR}/scripts/"
 for file in README.md LICENSE agent-extension.json after-install.md; do
   [ -f "${SOURCE_DIR}/${file}" ] && install -m 0644 "${SOURCE_DIR}/${file}" "${PLUGIN_DIR}/${file}"
 done

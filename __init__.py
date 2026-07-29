@@ -2,8 +2,9 @@
 
 Graphiti extracts entities, relationships, facts, and validity windows with the
 model/provider already selected in Hermes. FastEmbed performs semantic vector
-work locally, and Kuzu stores the graph in-process under the active
-``HERMES_HOME``. No daemon, second API key, or Hermes core patch is required.
+work locally, and LadybugDB (the maintained Kuzu continuation) stores the graph
+in-process under the active ``HERMES_HOME``. No daemon, second API key, or
+Hermes core patch is required.
 """
 
 from __future__ import annotations
@@ -13,6 +14,8 @@ import concurrent.futures
 import json
 import logging
 import os
+import subprocess
+import sys
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -60,9 +63,9 @@ class _AsyncLoop:
 
 
 class GraphMemoryProvider(MemoryProvider):
-    """Hermes ``MemoryProvider`` backed by Graphiti and embedded Kuzu.
+    """Hermes ``MemoryProvider`` backed by Graphiti and embedded LadybugDB.
 
-    Kuzu supports one writer process per database. Hermes profiles already have
+    LadybugDB supports one writer process per database. Hermes profiles already have
     separate ``HERMES_HOME`` roots; within a profile, run one long-lived Hermes
     process (normally the gateway) while graph memory is active.
     """
@@ -92,8 +95,7 @@ class GraphMemoryProvider(MemoryProvider):
         try:
             import fastembed  # noqa: F401
             import graphiti_core  # noqa: F401
-            import kuzu  # noqa: F401
-            from graphiti_core.driver.kuzu_driver import KuzuDriver  # noqa: F401
+            import ladybug  # noqa: F401
             return True
         except Exception as exc:
             logger.warning("graph-memory dependencies unavailable: %s", exc)
@@ -119,9 +121,8 @@ class GraphMemoryProvider(MemoryProvider):
             )
 
         from graphiti_core import Graphiti
-        from graphiti_core.driver.kuzu_driver import KuzuDriver
-
         from .hermes_llm import HermesAgentLLMClient
+        from .ladybug_driver import LadybugDriver
         from .local_embeddings import LocalCosineReranker, LocalFastEmbedder
 
         agent_context = str(kwargs.get("agent_context") or "primary")
@@ -146,16 +147,20 @@ class GraphMemoryProvider(MemoryProvider):
 
         state_dir = Path(self._hermes_home) / "graph-memory"
         state_dir.mkdir(parents=True, exist_ok=True)
-        self._database_path = str(state_dir / "graph.kuzu")
+        legacy_path = state_dir / "graph.kuzu"
+        ladybug_path = state_dir / "graph.lbug"
+        if legacy_path.exists() and not ladybug_path.exists():
+            self._migrate_legacy_database(legacy_path, ladybug_path)
+        self._database_path = str(ladybug_path)
 
         self._async = _AsyncLoop()
         try:
             embedder = LocalFastEmbedder(self._embedding_model)
             reranker = LocalCosineReranker(self._embedding_model)
-            # Kuzu is intentionally single-tenant here. Passing a custom
+            # Ladybug is intentionally single-tenant here. Passing a custom
             # group_id triggers a known Graphiti 0.29.3 KuzuDriver bug; profile
             # isolation is instead provided by the HERMES_HOME-specific DB.
-            driver = KuzuDriver(db=self._database_path)
+            driver = LadybugDriver(db=self._database_path)
             self._graphiti = Graphiti(
                 graph_driver=driver,
                 llm_client=HermesAgentLLMClient(),
@@ -163,7 +168,7 @@ class GraphMemoryProvider(MemoryProvider):
                 cross_encoder=reranker,
                 max_coroutines=1,
             )
-            self._async.run(self._ensure_kuzu_indexes(driver), timeout=120)
+            self._async.run(self._ensure_ladybug_indexes(driver), timeout=120)
             vector = self._async.run(embedder.create("graph-memory warmup"), timeout=180)
             if not vector:
                 raise RuntimeError("local embedding model returned an empty vector")
@@ -187,16 +192,40 @@ class GraphMemoryProvider(MemoryProvider):
         )
 
     @staticmethod
-    async def _ensure_kuzu_indexes(driver) -> None:
-        """Create Graphiti's four required Kuzu FTS indexes idempotently.
+    def _migrate_legacy_database(legacy_path: Path, ladybug_path: Path) -> None:
+        """Export a legacy Kuzu store and import it into Ladybug atomically."""
+        script = Path(__file__).parent / "scripts" / "migrate_kuzu_to_ladybug.py"
+        if not script.exists():
+            raise RuntimeError(f"legacy migration helper is missing: {script}")
+        result = subprocess.run(
+            [sys.executable, str(script), "migrate", str(legacy_path), str(ladybug_path)],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout or "unknown failure").strip()
+            raise RuntimeError(f"Kuzu to Ladybug migration failed: {detail}")
+        logger.info(
+            "graph-memory migrated legacy Kuzu database to Ladybug; legacy backup retained at %s",
+            legacy_path,
+        )
 
-        Graphiti 0.29.3's ``KuzuDriver.build_indices_and_constraints`` is a
-        no-op even though its search path requires these indexes. Creating them
-        here is a driver-compatibility fix contained entirely in the plugin.
+    @staticmethod
+    async def _ensure_ladybug_indexes(driver) -> None:
+        """Load Ladybug FTS and create Graphiti's indexes idempotently.
+
+        Ladybug ships FTS as an extension instead of Kuzu's implicit autoload.
+        Graphiti 0.29.3's embedded-driver index setup is also a no-op even
+        though its search path requires these indexes. Keep both compatibility
+        steps inside the provider boundary.
         """
         from graphiti_core.driver.driver import GraphProvider
         from graphiti_core.graph_queries import get_fulltext_indices
 
+        # INSTALL is idempotent and ensures the extension is available on a
+        # fresh host; LOAD is connection-scoped and required on every startup.
+        await driver.execute_query("INSTALL FTS")
+        await driver.execute_query("LOAD EXTENSION FTS")
         for query in get_fulltext_indices(GraphProvider.KUZU):
             try:
                 await driver.execute_query(query)
@@ -209,7 +238,7 @@ class GraphMemoryProvider(MemoryProvider):
             raise RuntimeError("graph-memory is not initialized")
         from graphiti_core.nodes import EpisodeType
 
-        # group_id MUST remain None for the Kuzu driver (see initialize()).
+        # group_id MUST remain None for the embedded driver (see initialize()).
         return self._async.run(
             self._graphiti.add_episode(
                 name=f"{source_description}:{operation_id}",
@@ -350,7 +379,7 @@ class GraphMemoryProvider(MemoryProvider):
         if not query.strip():
             return []
         try:
-            # group_ids=None is required for the Kuzu driver's default group.
+            # group_ids=None is required for the embedded driver's default group.
             edges = self._async.run(
                 self._graphiti.search(
                     query=query,

@@ -22,11 +22,11 @@ def test_local_reranker_puts_identical_meaning_first():
         reranker.rank(
             "Which database stores graph memory?",
             [
-                "Kuzu stores the graph-memory database.",
+                "LadybugDB stores the graph-memory database.",
                 "The weather is sunny in Tallinn.",
             ],
         )
     )
 
-    assert ranked[0][0] == "Kuzu stores the graph-memory database."
+    assert ranked[0][0] == "LadybugDB stores the graph-memory database."
     assert ranked[0][1] > ranked[1][1]
